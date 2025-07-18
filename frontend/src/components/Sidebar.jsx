@@ -1,5 +1,13 @@
-// Sidebar.jsx
 import React from 'react';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetDescription, // Optional, but good for context
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react'; // Close icon
 
 const Sidebar = ({ tasks, isOpen, onClose }) => {
     // Calculate statistics
@@ -21,29 +29,38 @@ const Sidebar = ({ tasks, isOpen, onClose }) => {
     }).length;
 
     return (
-        <div className={`fixed top-0 left-0 h-full bg-gray-800 text-white w-64 p-5 shadow-lg transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out z-40`}>
-            <button
-                onClick={onClose}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl"
-            >
-                &times;
-            </button>
-            <h2 className="text-2xl font-bold mb-6 mt-4">Task Summary</h2>
-            <ul className="space-y-4">
-                <li>
-                    <span className="font-semibold">Total Tasks:</span> {totalTasks}
-                </li>
-                <li>
-                    <span className="font-semibold">Completed Tasks:</span> {completedTasks}
-                </li>
-                <li>
-                    <span className="font-semibold">Pending Tasks:</span> {pendingTasks}
-                </li>
-                <li>
-                    <span className="font-semibold">Upcoming Deadlines (7 days):</span> {upcomingDeadlines}
-                </li>
-            </ul>
-        </div>
+        <Sheet open={isOpen} onOpenChange={onClose}>
+            <SheetContent side="left" className="w-64 bg-card text-card-foreground p-5 flex flex-col">
+                <SheetHeader className="mb-6">
+                    <SheetTitle className="text-2xl font-bold mt-4">Task Summary</SheetTitle>
+                    <SheetDescription>
+                        A quick overview of your task statistics.
+                    </SheetDescription>
+                </SheetHeader>
+
+                <ul className="space-y-4 flex-grow"> {/* flex-grow to push close button to bottom if needed */}
+                    <li className="flex justify-between items-center text-lg">
+                        <span className="font-semibold">Total Tasks:</span> <span className="text-primary">{totalTasks}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-lg">
+                        <span className="font-semibold">Completed Tasks:</span> <span className="text-green-500">{completedTasks}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-lg">
+                        <span className="font-semibold">Pending Tasks:</span> <span className="text-orange-500">{pendingTasks}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-lg">
+                        <span className="font-semibold">Upcoming Deadlines (7 days):</span> <span className="text-destructive">{upcomingDeadlines}</span>
+                    </li>
+                </ul>
+
+                {/* Close button at the bottom for better UX on mobile */}
+                <div className="mt-auto pt-4 border-t border-border">
+                    <Button onClick={onClose} className="w-full" variant="secondary">
+                        <X className="mr-2 h-4 w-4" /> Close Sidebar
+                    </Button>
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 };
 

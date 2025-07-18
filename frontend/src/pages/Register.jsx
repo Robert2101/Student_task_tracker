@@ -4,117 +4,170 @@ import { useAuthStore } from "../store/useAuthStore.js";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 
+// Shadcn UI Components
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+
 const Register = () => {
     const [formData, setFormData] = useState({
         name: "",
         email: "",
-        password: ""
+        password: "",
     });
     const { signup, isSigningUp } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
+
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
     const validateForm = () => {
-        if (!formData.name.trim()) return toast.error("Full name is required");
-        if (!formData.email.trim()) return toast.error("Email is required");
-        if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
-        if (!formData.password) return toast.error("Password is required");
-        if (formData.password.length < 6) return toast.error("Password must be at least 6 characters");
-
+        if (!formData.name.trim()) {
+            toast.error("Full name is required");
+            return false;
+        }
+        if (!formData.email.trim()) {
+            toast.error("Email is required");
+            return false;
+        }
+        if (!/\S+@\S+\.\S+/.test(formData.email)) {
+            toast.error("Invalid email format");
+            return false;
+        }
+        if (!formData.password) {
+            toast.error("Password is required");
+            return false;
+        }
+        if (formData.password.length < 6) {
+            toast.error("Password must be at least 6 characters");
+            return false;
+        }
         return true;
     };
+
     const handleSubmit = (e) => {
         e.preventDefault();
-
-        const success = validateForm();
-
-        if (success === true) signup(formData);
+        const isValid = validateForm();
+        if (isValid) signup(formData); // Only call signup if validation passes
     };
+
     return (
         <>
-        <nav className="bg-white shadow-md fixed top-0 left-0 right-0 z-50">
+            {/* Navbar - Consistent with Login page */}
+            <nav className="bg-card text-card-foreground shadow-md fixed top-0 left-0 right-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-                    <h1 className="text-xl font-bold text-blue-600"><Link to="/">Task Tracker</Link></h1>
-                    <ul className="flex space-x-6 text-blue-600 font-medium">
+                    <h1 className="text-xl font-bold text-primary">
+                        <Link to="/">Task Tracker</Link>
+                    </h1>
+                    <ul className="flex space-x-6 font-medium">
                         <li>
-                            <Link to="/login" className="hover:underline">Login</Link>
+                            <Link to="/login" className="hover:text-primary transition-colors">
+                                Login
+                            </Link>
                         </li>
                         <li>
-                            <Link to="/register" className="hover:underline">Register</Link>
+                            <Link to="/register" className="hover:text-primary transition-colors">
+                                Register
+                            </Link>
                         </li>
                     </ul>
                 </div>
             </nav>
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-            <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-6 space-y-6">
-                <h2 className="text-2xl font-bold text-center">Create an Account</h2>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    {/* Name Field */}
-                    <div className="relative">
-                        <User className="absolute left-3 top-3 text-gray-400" size={20} />
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Full Name"
-                            className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.name}
-                            onChange={handleChange}
-                        />
-                    </div>
+            {/* Main Content Area - Centered and theme-aware background */}
+            <div className="min-h-screen flex items-center justify-center bg-background px-4 pt-16 pb-4"> {/* pt-16 for navbar offset */}
+                {/* Register Card */}
+                <Card className="w-full max-w-md shadow-lg rounded-xl">
+                    <CardHeader className="space-y-1">
+                        <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
+                        <CardDescription className="text-center">
+                            Enter your details to create a new account.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            {/* Name Field */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Full Name</Label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                                    <Input
+                                        id="name"
+                                        type="text"
+                                        name="name"
+                                        placeholder="John Doe"
+                                        value={formData.name}
+                                        onChange={handleChange}
+                                        className="pl-10"
+                                    />
+                                </div>
+                            </div>
 
-                    {/* Email Field */}
-                    <div className="relative">
-                        <Mail className="absolute left-3 top-3 text-gray-400" size={20} />
-                        <input
-                            type="email"
-                            name="email"
-                            placeholder="Email"
-                            className="w-full pl-10 pr-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.email}
-                            onChange={handleChange}
-                        />
-                    </div>
+                            {/* Email Field */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="email">Email</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        placeholder="your@example.com"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        className="pl-10"
+                                    />
+                                </div>
+                            </div>
 
-                    {/* Password Field */}
-                    <div className="relative">
-                        <Lock className="absolute left-3 top-3 text-gray-400" size={20} />
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            name="password"
-                            placeholder="Password"
-                            className="w-full pl-10 pr-10 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.password}
-                            onChange={handleChange}
-                        />
-                        <span
-                            className="absolute right-3 top-3 text-gray-400 cursor-pointer"
-                            onClick={() => setShowPassword(!showPassword)}
-                        >
-                            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                        </span>
-                    </div>
+                            {/* Password Field */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="password">Password</Label>
+                                <div className="relative">
+                                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        placeholder="••••••••"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        className="pl-10 pr-10"
+                                    />
+                                    <span
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                    >
+                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    </span>
+                                </div>
+                            </div>
 
-                    {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={isSigningUp}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md"
-                    >
-                        {isSigningUp ? "Creating account..." : "Sign Up"}
-                    </button>
-                </form>
-
-                <p className="text-sm text-center">
-                    Already have an account?{" "}
-                    <Link to="/login" className="text-blue-600 hover:underline">
-                        Login
-                    </Link>
-                </p>
+                            {/* Submit Button */}
+                            <Button type="submit" className="w-full" disabled={isSigningUp}>
+                                {isSigningUp ? "Creating account..." : "Sign Up"}
+                            </Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter className="flex flex-col gap-2">
+                        <p className="text-sm text-center text-muted-foreground">
+                            Already have an account?{" "}
+                            <Link to="/login" className="text-primary hover:underline font-medium">
+                                Login
+                            </Link>
+                        </p>
+                    </CardFooter>
+                </Card>
             </div>
-        </div>
         </>
     );
 };

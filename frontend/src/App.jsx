@@ -29,7 +29,7 @@ function App() {
     );
 
   return (
-    <>
+    <div className="min-h-screen bg-background text-foreground">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={!authUser ? <Login /> : <Navigate to="/dashboard" />} />
@@ -39,7 +39,7 @@ function App() {
       </Routes>
 
       <Toaster />
-    </>
+    </div>
   );
 }
 
