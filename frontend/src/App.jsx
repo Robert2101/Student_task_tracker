@@ -8,6 +8,7 @@ import { useAuthStore } from "./store/useAuthStore.js";
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
+import ThemeSwitcher from "./components/theme-switcher.jsx";
 
 function App() {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -39,6 +40,8 @@ function App() {
       </Routes>
 
       <Toaster />
+
+      <ThemeSwitcher />
     </div>
   );
 }
