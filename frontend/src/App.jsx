@@ -32,7 +32,7 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={!authUser ? <Home /> : <Navigate to="/dashboard" />} />
         <Route path="/login" element={!authUser ? <Login /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={!authUser ? <Register /> : <Navigate to="/dashboard" />} />
         <Route path="/dashboard" element={authUser ? <Dashboard /> : <Navigate to="/login" />} />

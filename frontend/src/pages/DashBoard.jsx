@@ -176,7 +176,7 @@ const DashBoard = () => {
     return (
         <div className="min-h-screen bg-background text-foreground flex"> {/* Main flex container */}
             {/* Sidebar Component (Desktop fixed, Mobile Sheet) */}
-            <Sidebar tasks={tasks} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+            {/* <Sidebar tasks={tasks} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} /> */}
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto">
@@ -190,7 +190,7 @@ const DashBoard = () => {
                         className="md:hidden mr-4" // Only show on mobile
                         aria-label="Open Sidebar"
                     >
-                        <Menu className="h-6 w-6" />
+                        {/* <Menu className="h-6 w-6" /> */}
                     </Button>
                     <h1 className="text-3xl md:text-4xl font-bold text-primary flex-1">Task Dashboard</h1>
                     <div className="flex space-x-3 md:space-x-4">
