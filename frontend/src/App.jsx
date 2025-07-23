@@ -2,8 +2,8 @@ import { Route, Routes, Navigate } from 'react-router-dom';
 import Home from "./pages/Home.jsx";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
-import AddTask from "./pages/AddTask.jsx";
+import StudentDashboard from "./pages/StudentDashboard.jsx"; // New import
+import InstructorDashboard from "./pages/InstructorDashboard.jsx"; // New import
 import { useAuthStore } from "./store/useAuthStore.js";
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
@@ -22,25 +22,39 @@ function App() {
     console.log("🔄 Auth state changed:", { authUser, isCheckingAuth });
   }, [authUser, isCheckingAuth]);
 
-  if (isCheckingAuth && !authUser)
+  if (isCheckingAuth)
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-background text-foreground">
+        <Loader className="size-10 animate-spin text-primary" />
       </div>
     );
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Routes>
+        {/* Public Routes */}
         <Route path="/" element={!authUser ? <Home /> : <Navigate to="/dashboard" />} />
         <Route path="/login" element={!authUser ? <Login /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={!authUser ? <Register /> : <Navigate to="/dashboard" />} />
-        <Route path="/dashboard" element={authUser ? <Dashboard /> : <Navigate to="/login" />} />
-        <Route path="/add-task" element={authUser ? <AddTask /> : <Navigate to="/login" />} />
+
+        {/* Protected Dashboard Route - Renders based on role */}
+        <Route
+          path="/dashboard"
+          element={
+            authUser ? (
+              authUser.role === 'student' ? (
+                <StudentDashboard />
+              ) : (
+                <InstructorDashboard />
+              )
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
       </Routes>
 
       <Toaster />
-
       <ThemeSwitcher />
     </div>
   );

@@ -13,6 +13,12 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: true,
+    },
+    // New: Add a role field, defaulting to 'student'
+    role: {
+        type: String,
+        enum: ['student', 'instructor'], // Enforce specific roles
+        default: 'student',
     }
 }, {
     timestamps: true,

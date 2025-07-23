@@ -14,10 +14,14 @@ import {
     LogOut,
     Search,
     Filter,
-    ListTodo, // For total tasks icon
-    CheckCircle, // For completed tasks icon
-    Hourglass, // For pending tasks icon
-    Clock, // For upcoming deadlines icon
+    ListTodo,
+    CheckCircle,
+    Hourglass,
+    Clock,
+    Briefcase, // For instructor icon
+    GraduationCap, // For student icon
+    UserCheck, // For assigned student status
+    UserX, // For assigned student status
 } from 'lucide-react';
 
 // Shadcn UI Components
@@ -52,10 +56,11 @@ import { Separator } from '@/components/ui/separator'; // For visual breaks
 import { Badge } from '@/components/ui/badge'; // For status/priority display
 import { cn } from '@/lib/utils'; // Utility for conditional class names
 import { format } from 'date-fns'; // For date formatting in Popover trigger
+import { ScrollArea } from '@/components/ui/scroll-area'; // For scrollable student list in instructor view
 
 const DashBoard = () => {
     const { tasks, loading, fetchTasks, deleteTask, updateTask, createTask } = useTaskStore();
-    const { logout } = useAuthStore();
+    const { authUser, logout } = useAuthStore();
 
     const [editingTask, setEditingTask] = useState(null);
     const [updatedTaskData, setUpdatedTaskData] = useState({
@@ -67,7 +72,7 @@ const DashBoard = () => {
     });
 
     const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for mobile sidebar
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
@@ -75,12 +80,16 @@ const DashBoard = () => {
     const [filterDueDate, setFilterDueDate] = useState(null);
 
     useEffect(() => {
-        fetchTasks();
-    }, [fetchTasks]);
+        if (authUser) {
+            fetchTasks();
+        }
+    }, [fetchTasks, authUser]);
 
-    const filteredTasks = useMemo(() => {
+    // Memoized function to filter tasks (for students) or group tasks (for instructors)
+    const processedTasks = useMemo(() => {
         let currentTasks = tasks;
 
+        // Apply search filter first
         if (searchTerm) {
             const lowerCaseSearchTerm = searchTerm.toLowerCase();
             currentTasks = currentTasks.filter(
@@ -90,14 +99,17 @@ const DashBoard = () => {
             );
         }
 
+        // Apply status filter
         if (filterStatus !== 'all') {
             currentTasks = currentTasks.filter((task) => task.status === filterStatus);
         }
 
+        // Apply priority filter
         if (filterPriority !== 'all') {
             currentTasks = currentTasks.filter((task) => task.priority === filterPriority);
         }
 
+        // Apply due date filter
         if (filterDueDate) {
             const selectedDateString = filterDueDate.toDateString();
             currentTasks = currentTasks.filter(
@@ -105,10 +117,38 @@ const DashBoard = () => {
             );
         }
 
-        return currentTasks;
-    }, [tasks, searchTerm, filterStatus, filterPriority, filterDueDate]);
+        // If instructor, group tasks by title/description
+        if (authUser?.role === 'instructor') {
+            const grouped = {};
+            currentTasks.forEach(task => {
+                // Use a composite key for grouping unique tasks created by this instructor
+                const key = `${task.title}::${task.description}::${task.createdBy._id}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        _id: task._id, // Keep one ID for potential reference, though not for update/delete all
+                        title: task.title,
+                        description: task.description,
+                        dueDate: task.dueDate,
+                        priority: task.priority,
+                        createdBy: task.createdBy,
+                        assignedStudents: [], // Array to hold students and their statuses for this task
+                    };
+                }
+                grouped[key].assignedStudents.push({
+                    studentId: task.assignedTo._id,
+                    studentName: task.assignedTo.name,
+                    status: task.status,
+                    taskId: task._id, // Store the individual task ID for status updates
+                });
+            });
+            return Object.values(grouped);
+        }
 
-    // Statistics for the dashboard summary cards
+        // For students, just return the filtered tasks
+        return currentTasks;
+    }, [tasks, searchTerm, filterStatus, filterPriority, filterDueDate, authUser?.role]);
+
+    // Statistics for the dashboard summary cards (based on all tasks, not filtered/grouped)
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(task => task.status === 'completed').length;
     const pendingTasks = tasks.filter(task => task.status === 'pending').length;
@@ -130,12 +170,29 @@ const DashBoard = () => {
     const handleEditClick = (task) => {
         setEditingTask(task._id);
         setUpdatedTaskData({
-            title: task.title,
-            description: task.description,
-            dueDate: new Date(task.dueDate),
-            priority: task.priority,
-            status: task.status,
+            title: '', // Clear title/description/priority/dueDate when editing a grouped task
+            description: '',
+            dueDate: new Date(),
+            priority: 'low',
+            status: task.status, // Keep status as it's the only editable field for students
         });
+        // For instructor grouped task, we don't allow editing title/desc/due/priority directly here.
+        // If editing a student's personal task, then populate.
+        if (authUser?.role === 'student' || (authUser?.role === 'instructor' && task.createdBy._id === authUser.id && task.assignedTo._id === authUser.id)) {
+            setUpdatedTaskData({
+                title: task.title,
+                description: task.description,
+                dueDate: new Date(task.dueDate),
+                priority: task.priority,
+                status: task.status,
+            });
+        }
+    };
+
+    // New: Handle update for instructor's grouped task (only status of assigned student)
+    const handleUpdateAssignedStudentStatus = async (taskId, newStatus) => {
+        await updateTask(taskId, { status: newStatus });
+        toast.success("Student task status updated!");
     };
 
     const handleUpdateTaskChange = (e) => {
@@ -148,11 +205,17 @@ const DashBoard = () => {
     };
 
     const handleUpdateTask = async (taskId) => {
-        if (!updatedTaskData.title || !updatedTaskData.description || !updatedTaskData.dueDate) {
+        // For student updating status, only status is needed
+        if (canStudentUpdateStatus({ _id: taskId, assignedTo: { _id: authUser.id }, createdBy: { _id: 'dummy' } }) && !canEditTask({ _id: taskId, createdBy: { _id: authUser.id }, assignedTo: { _id: authUser.id } })) {
+            await updateTask(taskId, { status: updatedTaskData.status });
+            toast.success("Task status updated successfully!");
+        } else if (!updatedTaskData.title || !updatedTaskData.description || !updatedTaskData.dueDate) {
             toast.error("Please fill in all required fields for the task update.");
             return;
+        } else {
+            await updateTask(taskId, updatedTaskData);
+            toast.success("Task updated successfully!");
         }
-        await updateTask(taskId, updatedTaskData);
         setEditingTask(null);
     };
 
@@ -166,54 +229,122 @@ const DashBoard = () => {
 
     const handleCreateTaskInDashboard = async (taskData) => {
         await createTask(taskData);
+        setShowCreateTaskModal(false);
     };
 
     const handleLogout = async () => {
         await logout();
-        // Redirect logic handled by App.jsx's Route protection
+    };
+
+    // Determine if the current user can edit/delete a specific task (for student view)
+    const canEditTask = (task) => {
+        if (!authUser) return false;
+        // Instructor can edit tasks they created (individual instance)
+        if (authUser.role === 'instructor' && task.createdBy._id === authUser.id) {
+            return true;
+        }
+        // Student can edit tasks they created (personal tasks)
+        if (authUser.role === 'student' && task.createdBy._id === authUser.id && task.assignedTo._id === authUser.id) {
+            return true;
+        }
+        return false;
+    };
+
+    const canDeleteTask = (task) => {
+        if (!authUser) return false;
+        // Only the creator can delete the task
+        return task.createdBy._id === authUser.id;
+    };
+
+    // Students can only update status of assigned tasks (if not creator)
+    const canStudentUpdateStatus = (task) => {
+        if (!authUser || authUser.role !== 'student') return false;
+        // If assignedTo is current student AND createdBy is NOT current student (assigned by instructor)
+        return task.assignedTo._id === authUser.id && task.createdBy._id !== authUser.id;
     };
 
     return (
-        <div className="min-h-screen bg-background text-foreground flex"> {/* Main flex container */}
+        <div className="min-h-screen bg-background text-foreground flex">
             {/* Sidebar Component (Desktop fixed, Mobile Sheet) */}
-            {/* <Sidebar tasks={tasks} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} /> */}
+            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} authUser={authUser} />
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col p-4 md:p-8 overflow-y-auto">
                 {/* Header Section */}
-                <header className="flex justify-between items-center mb-8 pb-4 border-b border-border sticky top-0 bg-background z-10">
-                    {/* Mobile Sidebar Toggle Button */}
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setIsSidebarOpen(true)}
-                        className="md:hidden mr-4" // Only show on mobile
-                        aria-label="Open Sidebar"
-                    >
-                        {/* <Menu className="h-6 w-6" /> */}
-                    </Button>
-                    <h1 className="text-3xl md:text-4xl font-bold text-primary flex-1">Task Dashboard</h1>
-                    <div className="flex space-x-3 md:space-x-4">
-                        {/* Add New Task Button with Dialog Trigger */}
-                        <Dialog open={showCreateTaskModal} onOpenChange={setShowCreateTaskModal}>
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Task
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]">
-                                <DialogHeader>
-                                    <DialogTitle>Create New Task</DialogTitle>
-                                    <DialogDescription>
-                                        Fill in the details for your new task.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <CreateTask
-                                    onCreateTask={handleCreateTaskInDashboard}
-                                    onClose={() => setShowCreateTaskModal(false)}
-                                />
-                            </DialogContent>
-                        </Dialog>
+                <header className="flex flex-col sm:flex-row justify-between items-center mb-8 pb-4 border-b border-border sticky top-0 bg-background z-10">
+                    <div className="flex items-center w-full sm:w-auto mb-4 sm:mb-0">
+                        {/* Mobile Sidebar Toggle Button */}
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="md:hidden mr-4"
+                            aria-label="Open Sidebar"
+                        >
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                        <h1 className="text-3xl md:text-4xl font-bold text-primary flex-1">Task Dashboard</h1>
+                    </div>
+                    <div className="flex items-center space-x-3 md:space-x-4 w-full sm:w-auto justify-end">
+                        {/* User Info */}
+                        {authUser && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                                {authUser.role === 'instructor' ? (
+                                    <Briefcase className="h-4 w-4 mr-1 text-primary" />
+                                ) : (
+                                    <GraduationCap className="h-4 w-4 mr-1 text-primary" />
+                                )}
+                                <span>{authUser.name} ({authUser.role})</span>
+                            </div>
+                        )}
+
+                        {/* Add New Task Button with Dialog Trigger - Only for Instructors */}
+                        {authUser?.role === 'instructor' && (
+                            <Dialog open={showCreateTaskModal} onOpenChange={setShowCreateTaskModal}>
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Assign New Task
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Assign New Task to All Students</DialogTitle>
+                                        <DialogDescription>
+                                            Fill in the details for the task to be assigned to all students.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <CreateTask
+                                        onCreateTask={handleCreateTaskInDashboard}
+                                        onClose={() => setShowCreateTaskModal(false)}
+                                        userRole={authUser.role}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        )}
+
+                        {/* Add New Task Button for Students (Personal Task) */}
+                        {authUser?.role === 'student' && (
+                            <Dialog open={showCreateTaskModal} onOpenChange={setShowCreateTaskModal}>
+                                <DialogTrigger asChild>
+                                    <Button>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Personal Task
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Create New Personal Task</DialogTitle>
+                                        <DialogDescription>
+                                            Fill in the details for your personal task.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <CreateTask
+                                        onCreateTask={handleCreateTaskInDashboard}
+                                        onClose={() => setShowCreateTaskModal(false)}
+                                        userRole={authUser.role}
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        )}
 
                         {/* Logout Button */}
                         <Button variant="destructive" onClick={handleLogout}>
@@ -364,149 +495,137 @@ const DashBoard = () => {
                                     <Loader className="size-8 animate-spin text-primary" />
                                     <p className="ml-2 text-muted-foreground">Loading tasks...</p>
                                 </div>
-                            ) : filteredTasks.length === 0 ? (
+                            ) : processedTasks.length === 0 ? (
                                 <p className="text-center text-muted-foreground p-8">
                                     No tasks found matching your criteria. 😔
                                 </p>
                             ) : (
                                 <div className="space-y-4">
-                                    {filteredTasks.map((task) => (
+                                    {processedTasks.map((task) => (
                                         <Card
-                                            key={task._id}
-                                            className="p-4 flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0"
+                                            key={task._id} // For instructor, this is the ID of one instance, or a generated key
+                                            className="p-4 flex flex-col space-y-3"
                                         >
-                                            {editingTask === task._id ? (
-                                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    {/* Edit Task Fields */}
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor={`edit-title-${task._id}`}>Title</Label>
-                                                        <Input
-                                                            id={`edit-title-${task._id}`}
-                                                            name="title"
-                                                            value={updatedTaskData.title}
-                                                            onChange={handleUpdateTaskChange}
-                                                            required
-                                                        />
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor={`edit-description-${task._id}`}>Description</Label>
-                                                        <Input
-                                                            as="textarea" // Use Input component, but render as textarea
-                                                            id={`edit-description-${task._id}`}
-                                                            name="description"
-                                                            value={updatedTaskData.description}
-                                                            onChange={handleUpdateTaskChange}
-                                                            rows="1"
-                                                            required
-                                                        />
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor={`edit-dueDate-${task._id}`}>Due Date</Label>
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <Button
-                                                                    variant={"outline"}
-                                                                    className={cn(
-                                                                        "w-full justify-start text-left font-normal",
-                                                                        !updatedTaskData.dueDate && "text-muted-foreground"
-                                                                    )}
-                                                                >
-                                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                                    {updatedTaskData.dueDate ? format(updatedTaskData.dueDate, "PPP") : <span>Pick a date</span>}
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-auto p-0" align="start">
-                                                                <Calendar
-                                                                    mode="single"
-                                                                    selected={updatedTaskData.dueDate}
-                                                                    onSelect={handleUpdateTaskDateChange}
-                                                                    initialFocus
-                                                                />
-                                                            </PopoverContent>
-                                                        </Popover>
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor={`edit-priority-${task._id}`}>Priority</Label>
-                                                        <Select
-                                                            value={updatedTaskData.priority}
-                                                            onValueChange={(value) => handleUpdateTaskChange({ target: { name: 'priority', value } })}
+                                            {/* Task Details */}
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-semibold text-foreground">{task.title}</h3>
+                                                <p className="text-muted-foreground text-sm">{task.description}</p>
+                                                {/* FIX: Changed parent <p> to <div> to avoid hydration error */}
+                                                <div className="text-muted-foreground text-xs mt-1 space-x-2 flex flex-wrap items-center gap-y-1">
+                                                    <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                                                    <span className="mx-1">|</span> {/* Added mx-1 for spacing */}
+                                                    <span>Priority:{" "}
+                                                        <Badge
+                                                            variant={
+                                                                task.priority === 'high' ? 'destructive' :
+                                                                    task.priority === 'medium' ? 'secondary' :
+                                                                        'outline'
+                                                            }
+                                                            className={cn(
+                                                                task.priority === 'high' && 'bg-destructive/10 text-destructive',
+                                                                task.priority === 'medium' && 'bg-orange-500/10 text-orange-500',
+                                                                task.priority === 'low' && 'bg-green-500/10 text-green-500'
+                                                            )}
                                                         >
-                                                            <SelectTrigger id={`edit-priority-${task._id}`}>
-                                                                <SelectValue placeholder="Select Priority" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="low">Low</SelectItem>
-                                                                <SelectItem value="medium">Medium</SelectItem>
-                                                                <SelectItem value="high">High</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor={`edit-status-${task._id}`}>Status</Label>
-                                                        <Select
-                                                            value={updatedTaskData.status}
-                                                            onValueChange={(value) => handleUpdateTaskChange({ target: { name: 'status', value } })}
+                                                            {task.priority}
+                                                        </Badge>
+                                                    </span>
+                                                    {/* Display createdBy info for all users */}
+                                                    <span className="block mt-1 text-xs text-muted-foreground">
+                                                        {task.createdBy && task.assignedTo && task.createdBy._id === task.assignedTo._id && (
+                                                            <span className="italic">Personal task</span>
+                                                        )}
+                                                        {task.createdBy && task.assignedTo && task.createdBy._id !== task.assignedTo._id && (
+                                                            <span className="italic ml-2">Assigned by: {task.createdBy.name}</span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Instructor View: Assigned Students and their Statuses */}
+                                            {authUser?.role === 'instructor' && task.assignedStudents && (
+                                                <div className="mt-4 pt-3 border-t border-border">
+                                                    <h4 className="text-sm font-semibold text-foreground mb-2">Assigned Students:</h4>
+                                                    <ScrollArea className="h-40 w-full rounded-md border p-4 bg-background/50">
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                            {task.assignedStudents.map((student) => (
+                                                                <div key={student.studentId} className="flex items-center justify-between text-sm">
+                                                                    <span className="flex items-center">
+                                                                        <GraduationCap className="h-4 w-4 mr-2 text-muted-foreground" />
+                                                                        {student.studentName}
+                                                                    </span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <Badge
+                                                                            variant={student.status === 'completed' ? 'default' : 'secondary'}
+                                                                            className={cn(
+                                                                                student.status === 'completed' && 'bg-green-600/10 text-green-600',
+                                                                                student.status === 'pending' && 'bg-orange-600/10 text-orange-600'
+                                                                            )}
+                                                                        >
+                                                                            {student.status}
+                                                                        </Badge>
+                                                                        {/* Instructor can update status for each student's task instance */}
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => handleUpdateAssignedStudentStatus(
+                                                                                student.taskId,
+                                                                                student.status === 'completed' ? 'pending' : 'completed'
+                                                                            )}
+                                                                            className="h-6 w-6"
+                                                                            title={`Toggle status for ${student.studentName}`}
+                                                                        >
+                                                                            {student.status === 'completed' ? (
+                                                                                <UserCheck className="h-4 w-4 text-green-600" />
+                                                                            ) : (
+                                                                                <UserX className="h-4 w-4 text-orange-600" />
+                                                                            )}
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </ScrollArea>
+                                                </div>
+                                            )}
+
+                                            {/* Student View: Status and Actions */}
+                                            {authUser?.role === 'student' && (
+                                                <div className="flex justify-between items-center mt-3 pt-3 border-t border-border">
+                                                    {/* FIX: Changed parent <p> to <div> to avoid hydration error */}
+                                                    <div className="text-muted-foreground text-xs flex items-center gap-x-1">
+                                                        Status:{" "}
+                                                        <Badge
+                                                            variant={task.status === 'completed' ? 'default' : 'secondary'}
+                                                            className={cn(
+                                                                task.status === 'completed' && 'bg-green-600/10 text-green-600',
+                                                                task.status === 'pending' && 'bg-orange-600/10 text-orange-600'
+                                                            )}
                                                         >
-                                                            <SelectTrigger id={`edit-status-${task._id}`}>
-                                                                <SelectValue placeholder="Select Status" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="pending">Pending</SelectItem>
-                                                                <SelectItem value="completed">Completed</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                                            {task.status}
+                                                        </Badge>
                                                     </div>
-                                                    <div className="flex space-x-2 mt-4 md:mt-0 md:col-span-2 justify-end">
-                                                        <Button onClick={() => handleUpdateTask(task._id)} size="sm">
-                                                            Save
-                                                        </Button>
-                                                        <Button variant="outline" onClick={handleCancelEdit} size="sm">
-                                                            Cancel
-                                                        </Button>
+                                                    <div className="flex space-x-2">
+                                                        {/* Edit Button: Only if user can edit the task */}
+                                                        {canEditTask(task) && (
+                                                            <Button variant="outline" onClick={() => handleEditClick(task)} size="sm">
+                                                                Edit
+                                                            </Button>
+                                                        )}
+                                                        {/* Update Status Button (for assigned students only, if not creator) */}
+                                                        {canStudentUpdateStatus(task) && !canEditTask(task) && (
+                                                            <Button variant="secondary" onClick={() => handleEditClick(task)} size="sm">
+                                                                Update Status
+                                                            </Button>
+                                                        )}
+                                                        {/* Delete Button: Only if user can delete the task */}
+                                                        {canDeleteTask(task) && (
+                                                            <Button variant="destructive" onClick={() => handleDeleteTask(task._id)} size="sm">
+                                                                Delete
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            ) : (
-                                                <>
-                                                    <div className="flex-1">
-                                                        <h3 className="text-lg font-semibold text-foreground">{task.title}</h3>
-                                                        <p className="text-muted-foreground text-sm">{task.description}</p>
-                                                        <p className="text-muted-foreground text-xs mt-1">
-                                                            Due: {new Date(task.dueDate).toLocaleDateString()} | Priority:{" "}
-                                                            <Badge
-                                                                variant={
-                                                                    task.priority === 'high' ? 'destructive' :
-                                                                        task.priority === 'medium' ? 'secondary' :
-                                                                            'outline'
-                                                                }
-                                                                className={cn(
-                                                                    task.priority === 'high' && 'bg-destructive/10 text-destructive',
-                                                                    task.priority === 'medium' && 'bg-orange-500/10 text-orange-500',
-                                                                    task.priority === 'low' && 'bg-green-500/10 text-green-500'
-                                                                )}
-                                                            >
-                                                                {task.priority}
-                                                            </Badge>{" "}
-                                                            | Status:{" "}
-                                                            <Badge
-                                                                variant={task.status === 'completed' ? 'default' : 'secondary'}
-                                                                className={cn(
-                                                                    task.status === 'completed' && 'bg-green-600/10 text-green-600',
-                                                                    task.status === 'pending' && 'bg-orange-600/10 text-orange-600'
-                                                                )}
-                                                            >
-                                                                {task.status}
-                                                            </Badge>
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex space-x-2 mt-3 md:mt-0">
-                                                        <Button variant="outline" onClick={() => handleEditClick(task)} size="sm">
-                                                            Edit
-                                                        </Button>
-                                                        <Button variant="destructive" onClick={() => handleDeleteTask(task._id)} size="sm">
-                                                            Delete
-                                                        </Button>
-                                                    </div>
-                                                </>
                                             )}
                                         </Card>
                                     ))}

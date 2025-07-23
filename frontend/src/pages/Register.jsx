@@ -16,18 +16,31 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import { // New imports for Select component
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 const Register = () => {
     const [formData, setFormData] = useState({
         name: "",
         email: "",
         password: "",
+        role: "student", // New: Default role to student
     });
     const { signup, isSigningUp } = useAuthStore();
     const [showPassword, setShowPassword] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
+    // New: Handle change for the Shadcn Select component
+    const handleRoleChange = (value) => {
+        setFormData((prev) => ({ ...prev, role: value }));
     };
 
     const validateForm = () => {
@@ -51,13 +64,14 @@ const Register = () => {
             toast.error("Password must be at least 6 characters");
             return false;
         }
+        // No need to validate role here, as Select ensures valid options
         return true;
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         const isValid = validateForm();
-        if (isValid) signup(formData); // Only call signup if validation passes
+        if (isValid) signup(formData); // Send formData including the selected role
     };
 
     return (
@@ -90,7 +104,7 @@ const Register = () => {
                     <CardHeader className="space-y-1">
                         <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
                         <CardDescription className="text-center">
-                            Enter your details to create a new account.
+                            Enter your details and select your role to create a new account.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -150,6 +164,20 @@ const Register = () => {
                                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                     </span>
                                 </div>
+                            </div>
+
+                            {/* Role Selection Field (New) */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="role">Role</Label>
+                                <Select value={formData.role} onValueChange={handleRoleChange}>
+                                    <SelectTrigger id="role">
+                                        <SelectValue placeholder="Select your role" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="student">Student</SelectItem>
+                                        <SelectItem value="instructor">Instructor</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
 
                             {/* Submit Button */}

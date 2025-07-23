@@ -1,21 +1,39 @@
-import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
-dotenv.config();
+import jwt from "jsonwebtoken";
+import User from "../models/user.model.js"; // Import User model to fetch role
 
-const protectedRoute = (req, res, next) => {
-
-    const token = req.cookies.jwt;
-    if (!token) {
-        return res.status(401).json({ message: "Unauthorized access" });
-    }
+const protectedRoute = async (req, res, next) => {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const token = req.cookies.jwt;
+        if (!token) {
+            return res.status(401).json({ message: "Unauthorized - No Token Provided" });
+        }
 
-        req.userId = decoded.id;
-        next();
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded) {
+            return res.status(401).json({ message: "Unauthorized - Invalid Token" });
+        }
+
+        const user = await User.findById(decoded.id).select("-password"); // Exclude password
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        req.userId = user._id;
+        req.userRole = user.role; // New: Attach user's role to the request
+        req.user = user; // Attach full user object for convenience
+
+        next(); // Proceed to the next middleware/controller
+
     } catch (err) {
-        console.error("❌ JWT verification error:", err);
-        return res.status(403).json({ message: "Forbidden access" });
+        console.error("Error in protectedRoute:", err);
+        // Handle specific JWT errors
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: "Unauthorized - Token expired" });
+        }
+        if (err.name === 'JsonWebTokenError') {
+            return res.status(401).json({ message: "Unauthorized - Invalid token" });
+        }
+        return res.status(500).json({ message: "Internal Server Error" });
     }
 };
 

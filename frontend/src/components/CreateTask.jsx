@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import DatePicker from 'react-datepicker'; // Still needed for its core functionality
-import 'react-datepicker/dist/react-datepicker.css'; // Keep for base styles
+import React, { useState, useEffect } from 'react'; // Added useEffect for potential future use
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { toast } from 'react-hot-toast';
-import { Calendar as CalendarIcon } from 'lucide-react'; // Calendar icon
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 // Shadcn UI Components
 import { Button } from '@/components/ui/button';
@@ -16,16 +16,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar'; // Shadcn Calendar for styling
-import { cn } from '@/lib/utils'; // Utility for conditional class names
-import { format } from 'date-fns'; // For date formatting
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
-const CreateTask = ({ onCreateTask, onClose }) => {
+// Receive userRole as a prop
+const CreateTask = ({ onCreateTask, onClose, userRole }) => {
     const [newTask, setNewTask] = useState({
         title: '',
         description: '',
         dueDate: new Date(),
         priority: 'low',
+        // assignedToStudentId: '', // Removed this from state as instructors assign to all
     });
 
     const handleNewTaskChange = (e) => {
@@ -43,18 +45,30 @@ const CreateTask = ({ onCreateTask, onClose }) => {
             toast.error("Please fill in all required fields for the new task.");
             return;
         }
-        await onCreateTask(newTask);
+
+        // For instructors, assignedToStudentId is not needed as backend assigns to all
+        // For students, assignedTo will be handled by backend (defaults to creator)
+        const taskDataToSend = {
+            title: newTask.title,
+            description: newTask.description,
+            dueDate: newTask.dueDate,
+            priority: newTask.priority,
+            // No assignedToStudentId needed here for instructors, as backend handles "all students"
+            // No assignedToStudentId needed here for students, as backend handles "personal"
+        };
+
+        await onCreateTask(taskDataToSend);
+        // Reset form after submission
         setNewTask({
             title: '',
             description: '',
             dueDate: new Date(),
             priority: 'low',
         });
-        onClose(); // Close the modal after successful creation
+        // onClose is called by Dashboard.jsx after createTask is successful
     };
 
     return (
-        // Removed the outer fixed inset-0 div as DialogContent handles the modal overlay
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
             {/* Title Field */}
             <div className="grid gap-2">
@@ -64,7 +78,7 @@ const CreateTask = ({ onCreateTask, onClose }) => {
                     name="title"
                     value={newTask.title}
                     onChange={handleNewTaskChange}
-                    placeholder="e.g., Complete React Project"
+                    placeholder={userRole === 'instructor' ? "e.g., Complete Chapter 5 Reading" : "e.g., Finish Math Homework"}
                     required
                 />
             </div>
@@ -73,13 +87,13 @@ const CreateTask = ({ onCreateTask, onClose }) => {
             <div className="grid gap-2">
                 <Label htmlFor="new-task-description">Description</Label>
                 <Input
-                    as="textarea" // Render as textarea
+                    as="textarea"
                     id="new-task-description"
                     name="description"
                     value={newTask.description}
                     onChange={handleNewTaskChange}
                     rows="3"
-                    placeholder="Detailed description of the task..."
+                    placeholder={userRole === 'instructor' ? "Detailed explanation for all students..." : "Detailed description of your task..."}
                     required
                 />
             </div>
@@ -131,7 +145,7 @@ const CreateTask = ({ onCreateTask, onClose }) => {
 
             {/* Submit Button */}
             <Button type="submit" className="w-full mt-4">
-                Add Task
+                {userRole === 'instructor' ? "Assign Task to All" : "Add Task"}
             </Button>
         </form>
     );
