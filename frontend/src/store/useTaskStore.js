@@ -2,7 +2,7 @@ import { create } from "zustand";
 import axios from "axios";
 axios.defaults.withCredentials = true;
 import { toast } from "react-hot-toast";
-const BASE_URL = "http://localhost:5001";
+const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}`;
 
 // A helper function to get the fetchTasks function from the store
 const getFetchTasks = (get) => get().fetchTasks;

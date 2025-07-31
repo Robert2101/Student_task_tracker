@@ -2,8 +2,8 @@ import { create } from "zustand";
 import axios from "axios";
 axios.defaults.withCredentials = true;
 import { toast } from "react-hot-toast";
-const BASE_URL = "http://localhost:5001/api/auth";
-const TASK_BASE_URL = "http://localhost:5001/api/tasks"; // New: For fetching students
+const BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/api/auth`;
+const TASK_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/api/tasks`; // New: For fetching students
 
 export const useAuthStore = create((set) => ({
     authUser: null, // Will now also contain 'role'

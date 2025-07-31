@@ -55,9 +55,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative overflow-x-hidden">
-      {/* AnimatePresence handles the exit animations. 
-        `mode='wait'` ensures the exiting page finishes its animation before the new one enters.
-      */}
+      
       <AnimatePresence mode='wait'>
         {/* We pass the location.key to Routes. This tells AnimatePresence that the route has changed. */}
         <Routes location={location} key={location.key}>
