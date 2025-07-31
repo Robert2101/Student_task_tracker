@@ -12,7 +12,7 @@ dotenv.config();
 
 const app = express();
 app.use(cors({
-    origin: "https://student-task-tracker-kappa.vercel.app",
+    origin: process.env.FRONTEND_ORIGIN,
     credentials: true
 }));
 app.use(express.json());
